@@ -1,0 +1,955 @@
+#################################################################################################
+######################################## JOSH'S MEDIA STACK #####################################
+#################################################################################################
+
+# HEADPHONES
+# TRAEFIK
+# PORTAINER
+# NEXTCLOUD
+# POSTGR
+# REDIS
+# MARIADB
+# NETDATA
+# SYNCTHING
+# DOZZLE
+# HEIMDALL
+# OUROBOROS
+# CLOUDCMD
+# PHOTOSHOW
+# TRANSMISSION 
+# SABNZBD
+# NZBHYDA
+# JACKETT
+# RADARR 
+# SONARR
+# LIDARR
+# AIRSONIC
+# JELLYFIN
+
+version: "3.7"
+
+networks:
+  proxy:
+    external:
+      name: proxy
+  internal:
+    external: false
+  default:
+    driver: bridge
+
+volumes:
+   nextcloud:
+   db:
+
+services:
+
+#################################################################################################
+######################################## HEADPHONES #############################################
+#################################################################################################
+
+  headphones:
+    image: linuxserver/headphones
+    container_name: headphones
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    volumes:
+      - ${USERDIR}/docker/headphones:/config
+      - ${USERDIR}/downloads:/downloads
+      - ${USERDIR}/media/music:/music
+    ports:
+      - 8181:8181
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.backend: headphones
+      traefik.protocol: http
+      traefik.port: 8181
+      traefik.frontend.rule: "Host:headphones.${DOMAINNAME}"
+      traefik.frontend.headers.SSLHost: headphones.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## TRAEFIK ################################################
+#################################################################################################
+
+  traefik:
+    image: traefik:v1.7.16
+    container_name: traefik
+    hostname: traefik
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"
+    domainname: ${DOMAINNAME}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${USERDIR}/docker/traefik:/etc/traefik
+      - ${USERDIR}/docker/shared:/shared
+      - ${USERDIR}/docker/traefik/.htpasswd:/etc/traefik/.htpasswd:ro
+    environment:
+      CF_API_EMAIL: ${EMAIL}
+      CF_API_KEY: ${CF_API_KEY}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: traefik
+      traefik.protocol: http
+      traefik.port: 8080
+      traefik.frontend.rule: Host:traefik.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: traefik.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.frameDeny: "true"
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## PORTAINER ##############################################
+#################################################################################################
+
+  portainer:
+    image: portainer/portainer
+    container_name: portainer
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "9000:9000"
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/docker/portainer/data:/data
+    environment:
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: portainer
+      traefik.protocol: http
+      traefik.port: 9000
+      traefik.frontend.rule: Host:portainer.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: portainer.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## NEXTCLOUD ##############################################
+#################################################################################################
+
+
+#  db:
+#    image: mariadb
+#    container_name: mariadb
+#    networks:
+#      - internal
+#    volumes:
+#      - ${USERDIR}/docker/mariadb/db:/var/lib/mysql
+#      - /etc/localtime:/etc/localtime:ro
+#    environment:
+#      - MYSQL_ROOT_PASSWORD=${PASSWORD}
+#      - MYSQL_PASSWORD=${PASSWORD}
+#      - MYSQL_DATABASE=nextcloud
+#      - MYSQL_USER=nextcloud
+#    restart: unless-stopped
+
+#  app:
+#    image: nextcloud:latest
+#    container_name: nextcloud
+#    networks:
+#      - internal
+#    depends_on:
+#      - db
+#    volumes:
+#      - /mnt/nextcloud:/var/www/html
+#      - /mnt/nextcloud/config:/var/www/html/config
+#      - /mnt/nextcloud/apps:/var/www/html/custom_apps
+#      - /mnt/nextcloud/data:/var/www/html/data
+#      - /mnt/nextcloud/themes:/var/www/html/themes
+#      - /etc/localtime:/etc/localtime:ro
+#    env_file:
+#      - db.env
+#    restart: unless-stopped
+#    labels:
+#      - "traefik.backend=nextcloud"
+#      - "traefik.docker.network=proxy"
+#      - "traefik.enable=true"
+#      - "traefik.frontend.rule=Host:nextcloud.${DOMAINNAME}"
+#      - "traefik.port=80"
+#      - "traefik.frontend.headers.SSLRedirect=true"
+#      - "traefik.frontend.headers.contentTypeNosniff=true"
+#      - "traefik.frontend.headers.STSSeconds=315360000"
+#      - "traefik.frontend.headers.referrerPolicy=no-referrer"
+
+
+  app:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    volumes:
+      - /mnt/nextcloud/data:/var/www/html # /var/lib/docker/volumes/nextcloud_nextcloud/_data/
+      - ${USERDIR}/docker/nextcloud/config:/var/www/html/config
+      - /mnt/nextcloud/data:/mnt/nextcloud/data
+    env_file:
+      - db2.env
+    depends_on:
+      - db
+    networks:
+      - proxy
+      - internal
+    labels:
+      - "traefik.backend=nextcloud"
+      - "traefik.docker.network=proxy"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:nextcloud.${DOMAINNAME}"
+      - "traefik.port=80"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.referrerPolicy=no-referrer"
+
+
+####  db:
+#    container_name: mariadb
+#    image: mariadb
+#    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+#    restart: unless-stopped
+#    ports:
+#      - "3306:3306"
+#    networks:
+#      - internal
+#    volumes:
+#      - ${USERDIR}/docker/mariadb/db:/var/lib/mysql
+#    environment:
+#      - MYSQL_ROOT_PASSWORD=${PASSWORD}
+#      - MYSQL_PASSWORD=${PASSWORD}
+#      - MYSQL_DATABASE=nextcloud
+#      - MYSQL_USER=nextcloud
+
+
+#################################################################################################
+######################################## POSTGRES ###############################################
+#################################################################################################
+
+  db:
+    image: postgres
+    container_name: database
+    restart: unless-stopped
+    volumes:
+      - ${USERDIR}/docker/nextcloud/db:/var/lib/postgresql/data
+    env_file:
+      - db2.env
+    networks:
+      - internal
+
+#################################################################################################
+######################################## REDIS ##################################################
+#################################################################################################
+
+  redis:
+    image: redis
+    container_name: redis
+    volumes:
+      - ${USERDIR}/docker/nextcloud/redis:/data
+    networks:
+      - internal
+
+#################################################################################################
+######################################## MARIADB ################################################
+#################################################################################################    
+
+#  mariadb:
+#    container_name:  mariadb
+#    image: linuxserver/mariadb:latest
+#    restart: unless-stopped
+#    networks:
+#      - default
+#    ports:
+#      - "3306:3306"
+#    volumes:
+#      - ${USERDIR}/docker/mariadb/data:/config
+#      - /etc/timezone:/etc/timezone:ro
+#      - /etc/localtime:/etc/localtime:ro
+#    environment:
+#      - PUID=1000
+#      - PGID=1000
+#      - MYSQL_ROOT_PASSWORD=${PASSWORD}
+
+#################################################################################################
+######################################## NETDATA ################################################
+#################################################################################################
+
+  netdata:
+    image: titpetric/netdata
+    container_name: netdata
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - 19999:19999
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      traefik.enable: "true"
+      traefik.backend: netdata
+      traefik.protocol: http
+      traefik.port: 19999
+      traefik.frontend.rule: Host:netdata.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: netdata.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## SYNCTHING ##############################################
+#################################################################################################
+
+  syncthing:
+    image: linuxserver/syncthing
+    container_name: syncthing
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - 8384:8384
+      - 22000:22000
+      - 21027:21027/udp
+    volumes:
+      - ${USERDIR}/sync:/srv/data
+      - ${USERDIR}/docker/syncthing:/srv/config
+    environment:
+      PUID: 1000
+      PGID: 1000
+      UMASK_SET: 022
+    labels:
+      traefik.enable: "true"
+      traefik.backend: syncthing
+      traefik.protocol: http
+      traefik.port: 8384
+      traefik.frontend.rule: Host:sync.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: sync.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## DOZZLE #################################################
+#################################################################################################
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "8484:8080"
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_TAILSIZE: 300
+      DOZZLE_FILTER: "status=running"
+#      DOZZLE_FILTER: "label=log_me" # limits logs displayed to containers with this label
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      traefik.enable: "true"
+      traefik.backend: dozzle
+      traefik.protocol: http
+      traefik.port: 8080
+      traefik.frontend.rule: "Host:logs.${DOMAINNAME}"
+      traefik.frontend.headers.SSLHost: logs.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'  
+
+#################################################################################################
+######################################## HEIMDALL ###############################################
+#################################################################################################
+
+  heimdall:
+    image: linuxserver/heimdall:latest
+    container_name: heimdall
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+     - "88:80"
+    volumes:
+      - ${USERDIR}/docker/heimdall:/config
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: heimdall
+      traefik.protocol: http
+      traefik.port: 80
+      traefik.frontend.rule: Host:${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: ${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+      traefik.frontend.auth.basic: "${HTPASSWD}"
+
+#################################################################################################
+######################################## OUROBOROS ##############################################
+#################################################################################################
+
+  ouroboros:
+    image: pyouroboros/ouroboros:latest
+    container_name: ouroboros
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: ${TZ}
+      INTERVAL: 86400
+      LOG_LEVEL: debug
+      SELF_UPDATE: "true"
+      CLEANUP: "true"
+      IGNORE: traefik addon_core_check_config
+      NOTIFIERS: 'tgram://insert_token_here/insert_chat_id_here/'
+
+#################################################################################################
+######################################## CLOUDCMD ###############################################
+#################################################################################################
+
+  cloud_commander:
+    image: "coderaiser/cloudcmd"
+    container_name: "cloudcmd"
+    ports:
+      - 8000:8000
+    volumes:
+      - ~:/root
+      - /:/mnt/fs
+    labels:
+      traefik.enable: "true"
+      traefik.backend: cloudcmd
+      traefik.protocol: http
+      traefik.port: 8000
+      traefik.frontend.rule: "Host:files.${DOMAINNAME}"
+      traefik.frontend.headers.SSLHost: files.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}' 
+      traefik.frontend.auth.basic: "${HTPASSWD}"
+
+#################################################################################################
+######################################## PHOTOSHOW ##############################################
+#################################################################################################
+
+  photoshow:
+    image: linuxserver/photoshow:latest
+    container_name: photoshow
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "85:80"
+    volumes:
+      - ${USERDIR}/docker/photoshow/config:/config
+      - ${USERDIR}/docker/photoshow/thumbs:/thumbs
+      - ${USERDIR}/media/pictures:/pictures:ro
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: photoshow
+      traefik.protocol: http
+      traefik.port: 80
+      traefik.frontend.rule: Host:photos.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: photos.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## TRANSMISSION ###########################################
+#################################################################################################
+
+  transmission-vpn:
+    image: haugene/transmission-openvpn:latest
+    container_name: transmission-vpn
+    restart: unless-stopped
+    networks:
+      - proxy
+      - default
+    ports:
+      - "9091:9091"
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${USERDIR}/docker/transmission-vpn/data:/data
+      - ${USERDIR}/docker/transmission-vpn/config:/config
+      - ${USERDIR}/downloads:/downloads
+    environment:
+      OPENVPN_PROVIDER: IPVANISH
+      OPENVPN_USERNAME: ${EMAIL}
+      OPENVPN_PASSWORD: ${PASSWORD}
+      OPENVPN_CONFIG: "ipvanish-US-Los-Angeles-lax-a17"
+      OPENVPN_OPTS: --inactive 3600 --ping 10 --ping-exit 60
+      LOCAL_NETWORK: "192.168.1.1"
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+      UMASK_SET: 002
+      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "true"
+      TRANSMISSION_RPC_HOST_WHITELIST: "127.0.0.1,192.168.1.4"
+      TRANSMISSION_RPC_PASSWORD: ${PW}
+      TRANSMISSION_RPC_USERNAME: ${UN}
+      TRANSMISSION_UMASK: 002
+      TRANSMISSION_RATIO_LIMIT: 1.00
+      TRANSMISSION_RATIO_LIMIT_ENABLED: "true"
+      TRANSMISSION_ALT_SPEED_DOWN: 5000
+      TRANSMISSION_ALT_SPEED_ENABLED: "true"
+      TRANSMISSION_ALT_SPEED_UP: 15
+      TRANSMISSION_SPEED_LIMIT_DOWN: 9000
+      TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED: "true"
+      TRANSMISSION_SPEED_LIMIT_UP: 20
+      TRANSMISSION_SPEED_LIMIT_UP_ENABLED: "true"
+      TRANSMISSION_INCOMPLETE_DIR: /downloads
+      TRANSMISSION_INCOMPLETE_DIR_ENABLED: "true"
+      TRANSMISSION_WATCH_DIR: /downloads
+      TRANSMISSION_WATCH_DIR_ENABLED: "true"
+      TRANSMISSION_DOWNLOAD_DIR: /downloads
+    labels:
+      traefik.enable: "true"
+      traefik.backend: transmission-vpn
+      traefik.protocol: http
+      traefik.port: 9091
+      traefik.frontend.rule: Host:transmission.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: transmission.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## SABNZBD ################################################
+#################################################################################################
+
+  sabnzbd:
+    image: linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "8585:8080"
+    volumes:
+      - ${USERDIR}/docker/sabnzbd:/config
+      - ${USERDIR}/downloads:/downloads
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+      UMASK_SET: 002
+    labels:
+      traefik.enable: "true"
+      traefik.backend: sabnzbd
+      traefik.protocol: http
+      traefik.port: 8080
+      traefik.frontend.rule: Host:sabnzbd.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: sabnzbd.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## NZBHYDRA ###############################################
+#################################################################################################
+
+  hydra:
+    image: linuxserver/hydra2:latest
+    container_name: hydra
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "5076:5076"
+    volumes:
+      - ${USERDIR}/docker/hydra2:/config
+      - ${USERDIR}/downloads:/downloads
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: hydra
+      traefik.protocol: http
+      traefik.port: 5076
+      traefik.frontend.rule: Host:hydra.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: hydra.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## JACKETT ################################################
+#################################################################################################
+
+  jackett:
+    image: linuxserver/jackett:latest
+    container_name: jackett
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "9117:9117"
+    volumes:
+      - ${USERDIR}/docker/jackett:/config
+      - ${USERDIR}/downloads:/downloads
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: jackett
+      traefik.protocol: http
+      traefik.port: 9117
+      traefik.frontend.rule: Host:jackett.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: jackett.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+      traefik.frontend.auth.basic: "${HTPASSWD}"
+
+#################################################################################################
+######################################## RADARR #################################################
+#################################################################################################
+
+  radarr:
+    image: linuxserver/radarr:preview
+    container_name: radarr
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "7878:7878"
+    volumes:
+      - ${USERDIR}/docker/radarr:/config
+      - ${USERDIR}/downloads:/downloads
+      - ${USERDIR}/media:/media
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: radarr
+      traefik.protocol: http
+      traefik.port: 7878
+      traefik.frontend.rule: Host:radarr.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: radarr.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## SONARR #################################################
+#################################################################################################
+
+  sonarr:
+    image: linuxserver/sonarr:preview
+    container_name: sonarr
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "8989:8989"
+    volumes:
+      - ${USERDIR}/docker/sonarr:/config
+      - ${USERDIR}/downloads:/downloads
+      - ${USERDIR}/media:/media
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: sonarr
+      traefik.protocol: http
+      traefik.port: 8989
+      traefik.frontend.rule: Host:sonarr.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: sonarr.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
+
+#################################################################################################
+######################################## LIDARR #################################################
+#################################################################################################
+
+  lidarr:
+    image: linuxserver/lidarr:latest
+    container_name: lidarr
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "8686:8686"
+    volumes:
+      - ${USERDIR}/docker/lidarr:/config
+      - ${USERDIR}/downloads:/downloads
+      - ${USERDIR}/media/music:/music
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+    labels:
+      traefik.enable: "true"
+      traefik.backend: lidarr
+      traefik.protocol: http
+      traefik.port: 8686
+      traefik.frontend.rule: Host:lidarr.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: lidarr.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}' 
+
+#################################################################################################
+######################################## AIRSONIC ###############################################
+#################################################################################################
+
+  airsonic:
+    container_name: airsonic
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    image: linuxserver/airsonic
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=airsonic"
+      - "traefik.frontend.rule=Host:airsonic.${DOMAINNAME}"
+      - "traefik.port=4040"
+      - "traefik.docker.network=proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=${DOMAINNAME}"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.customFrameOptionsValue: allow-from https:${DOMAINNAME}"
+    networks:
+      - proxy
+    ports:
+      - 4040:4040
+    restart: unless-stopped
+    volumes:
+      - ${USERDIR}/docker/airsonic/config:/config
+      - ${USERDIR}/media/audiobooks:/airsonic/audiobooks
+      - ${USERDIR}/media/music:/airsonic/music
+      - ${USERDIR}/media/music/podcasts:/airsonic/podcasts
+      - ${USERDIR}/media/music/playlists:/airsonic/playlists
+
+#################################################################################################
+######################################## JELLYFIN ###############################################
+#################################################################################################
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    networks:
+      - proxy
+    ports:
+      - "8096:8096"
+      - "8920:8920"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ}
+      UMASK_SET: 022
+    volumes:
+      - ${USERDIR}/docker/jellyfin:/config
+      - /dev/shm:/ram_transcode
+      - ${USERDIR}/media:/media
+    labels:
+      traefik.enable: "true"
+      traefik.backend: jellyfin
+      traefik.protocol: http
+      traefik.port: 8096
+      traefik.frontend.rule: Host:jellyfin.${DOMAINNAME}
+      traefik.frontend.headers.SSLHost: jellyfin.${DOMAINNAME}
+      traefik.docker.network: proxy
+      traefik.frontend.passHostHeader: "true"
+      traefik.frontend.headers.SSLForceHost: "true"
+      traefik.frontend.headers.SSLRedirect: "true"
+      traefik.frontend.headers.browserXSSFilter: "true"
+      traefik.frontend.headers.contentTypeNosniff: "true"
+      traefik.frontend.headers.forceSTSHeader: "true"
+      traefik.frontend.headers.STSSeconds: 315360000
+      traefik.frontend.headers.STSIncludeSubdomains: "true"
+      traefik.frontend.headers.STSPreload: "true"
+      traefik.frontend.headers.customResponseHeaders: X-Robots-Tag:noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      traefik.frontend.headers.customFrameOptionsValue: 'allow-from https:${DOMAINNAME}'
